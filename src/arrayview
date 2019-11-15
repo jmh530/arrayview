@@ -1,0 +1,118 @@
+module arrayview;
+
+import std.stdio : writeln;
+import std.traits : isDynamicArray;
+
+public import std.range.primitives : popFront, popBack, front, back;
+
+/*
+	View is a dynamic array that cannot be appended to
+*/
+struct View(T)
+    if(isDynamicArray!T)
+{
+    import std.traits : ForeachType, Unqual;
+    
+	alias U = ForeachType!T;
+	
+	T _impl;
+    alias _impl this;
+    
+    this(T x) {
+     	_impl = x;
+    }
+
+    @property U* ptr()
+	{
+     	return _impl.ptr;
+    }
+
+    @property size_t length()
+	{
+     	return _impl.length;
+    }
+	
+	@property void length(size_t x)
+	{
+        import std.traits : isMutable;
+        static if (isMutable!T) {
+			assert(x <= _impl.length, "View!T.length may not be reduced");
+     		_impl.length = x;
+        } else {
+         	assert(0, "View!T is not mutable and length may not be modified");   
+        }
+    }
+	
+    @disable dup() {}
+    @disable idup() {}
+    
+    @disable opOpAssign(string op = "~")(inout(Unqual!(U)) rhs) {}
+    @disable opOpAssign(string op = "~")(T rhs) {}
+    @disable opBinary(string op = "~")(inout(Unqual!(U)) rhs) {}     
+    @disable opBinary(string op = "~")(T rhs) {}
+    
+    @disable put(E)(E e) {}
+    
+    View!T save() {
+        import std.range.primitives : save;
+        return this.save;
+    }
+}
+
+///
+unittest {
+    import std.array : array;
+
+    int[] x = [0, 3, 5];
+    auto y = View!(typeof(x))(x[0..2]);
+
+	assert(y.length == 2);
+}
+
+unittest {
+    import std.range.primitives : isInputRange, isForwardRange, isOutputRange,isBidirectionalRange, isRandomAccessRange;
+
+    int[] x = [0, 3, 5];
+    auto y = View!(typeof(x))(x[0..2]);
+    
+    alias R = typeof(y);
+
+    static assert(isInputRange!R);
+    static assert(isForwardRange!R);
+    static assert(!isOutputRange!(R, int));
+    static assert(isBidirectionalRange!R);
+    static assert(isRandomAccessRange!R);
+}
+
+unittest {
+    const(int[]) x = [0, 3, 5];
+    auto y = View!(typeof(x))(x[0..2]);
+}
+
+/*
+	Convenience function to create view
+*/
+auto view(T)(T x)
+    if(isDynamicArray!T)
+{
+	return View!(T)(x);    
+}
+
+///
+unittest {
+    import std.array : array;
+
+    int[] x = [0, 3, 5];
+    auto y = x[0..2].view;
+
+	static assert(is(typeof(y) == View!(int[])));
+}
+
+unittest {
+ 	writeln("last test");   
+}
+
+void main() {
+	writeln("tests complete");
+}
+
